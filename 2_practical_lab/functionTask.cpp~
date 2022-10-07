@@ -1,0 +1,17 @@
+#include <iostream>
+
+using namespace std;
+
+int main() {
+    float x; cout << "Please input x:"; cin >> x;
+
+    if (x < -2) {
+        cout << 4 << endl;
+    } else if (x < -1) {
+        cout << x * x + 1 << endl;
+    } else {
+        cout << 1 << endl;
+    }
+
+    return 0;
+}
