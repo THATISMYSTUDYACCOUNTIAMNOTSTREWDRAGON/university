@@ -19,4 +19,5 @@ int main() {
     } while(abs(current - prev) > accuracy);
     cout << sum;
     return 0;
+
 }
