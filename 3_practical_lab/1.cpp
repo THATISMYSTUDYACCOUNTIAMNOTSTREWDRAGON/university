@@ -6,19 +6,17 @@ using namespace std;
 const float accuracy = 0.012;
 
 int main() {
-    auto An = [](int n){
-        return ((2 * n) / pow(2 + n, 2)) * ((1) / pow((n + 1), 2));
-    };
-
     float sum = 0;
 
-    int i = 1;
-    while ( (abs(An(i) - An(i + 1))) > accuracy) {
-        sum += An(i);
-        i++;
-    }
-    sum += An(i + 1);
-
+    int n = 1;
+    float current  = ((2 * n) / pow(2 + n, 2)) * ((1) / pow((n + 1), 2));
+    float prev = 0;
+    do {
+        n++;
+        prev = current;
+        current  = ((2 * n) / pow(2 + n, 2)) * ((1) / pow((n + 1), 2));
+        sum += prev;
+    } while(abs(current - prev) > accuracy);
     cout << sum;
     return 0;
 }
