@@ -83,60 +83,8 @@ class Haff:
 
 haff = Haff()
 
-variable = """Keine Mauer zu hoch
-Keine Wege zu weit
-Immer alles gewagt
-Nie lang gefragt
-Dem Ruf der Freiheit gefolgt
-Und an das Morgen geglaubt
-Nimmermüde, neues Glück
-Nur nach vorn und nie zurück
-Wir waren zu jung zur falschen Zeit
-Und doch zum Sprung bereit
-Wir wollten fliegen
-Doch der Himmel war weg
-Unsere Hoffnung ging zu Boden
-Jetzt liegt sie neben uns im Dreck
-Wir wollten frei sein
-Und nicht um Liebe flehen
-Doch das Leben ist 'ne Hure
-Zockt dich ab und lässt dich stehen
-Keine Sehnsucht zu groß
-Keine Träne zu tief
-Wieder alles verloren
-Noch mal von vorn
-Wir zerfallen zu Staub
-Und wir stehen wieder auf
-Neue Wege, neues Glück
-Immer vorwärts, Stück für Stück
-Wir waren zu jung zur falschen Zeit
-Und doch zum Sprung bereit
-Wir wollten fliegen
-Doch der Himmel war weg
-Unsere Hoffnung ging zu Boden
-Jetzt liegt sie neben uns im Dreck
-Wir wollten frei sein
-Und nicht um Liebe flehen
-Doch das Leben ist 'ne Hure
-Zockt dich ab und lässt dich stehen
-Unsere Zeit heilt keine Wunden
-Der Schmerz kommt von allein
-Wer fängt dich auf, wenn du fällst?
-Wer steht für dich ein?
-Wir sind nicht unzerstörbar
-Doch wir halten alles aus
-Wir fallen aus allen Wolken
-Und dann stehen wir wieder auf
-Oh, yeah
-Wir wollten fliegen
-Doch der Himmel war weg
-Unsere Hoffnung ging zu Boden
-Jetzt liegt sie neben uns im Dreck (Jetzt liegt sie neben uns im Dreck)
-Wir wollten frei sein
-Und nicht um Liebe flehen (Nicht um Liebe flehen)
-Doch das Leben ist 'ne Hure
-Zockt dich ab und lässt dich stehen
-Und lässt dich stehen"""
+with open("sixthMessage.txt", "r", encoding="utf-8") as file:
+    variable = file.read()
 
 print(haff.encode(variable))
 print(haff.decode(haff.encode(variable), haff.get_haffman_tree()))

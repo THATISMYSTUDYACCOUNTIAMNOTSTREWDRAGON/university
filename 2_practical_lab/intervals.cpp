@@ -5,9 +5,9 @@ using namespace std;
 int main() {
 	float a, b, c;
 
-	cout << "X="; cin >> a;
-	cout << "Y="; cin >> b;
-	cout << "Z="; cin >> c;
+	cout << "A="; cin >> a;
+	cout << "B="; cin >> b;
+	cout << "C="; cin >> c;
 
     a = 2 <= a && a <= 7.2 ? 0: -2 <= a && a <= -0.5 ? a *= 2 : a;
     b = 2 <= b && b <= 7.2 ? 0: -2 <= b && b <= -0.5 ? b *= 2 : b;
