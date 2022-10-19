@@ -32,6 +32,26 @@ struct MenuItem {
     char description;
 };
 
+struct Terminal {
+    int width;
+    int height;
+};
+
+struct Point {
+    int x;
+    int y;
+};
+
+struct View : Terminal {
+    char **markup;
+    char **editableZone;
+    char **commandZone;
+    Point cursorPosition;
+    int amountUsedBottomSpace;
+    int amountUsedTopSpace;
+};
+
+
 struct Student {
     int id;
     char name[MAX_NAME_LENGTH];
@@ -43,19 +63,23 @@ struct Student {
     int secondMark;
     int thirdMark;
 };
+
+
  
-void getTerminalSize(int& width, int& height) {
+Terminal getTerminalProperties() {
+    Terminal terminal;
 #if defined(_WIN32)
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-    width = (int)(csbi.srWindow.Right-csbi.srWindow.Left+1);
-    height = (int)(csbi.srWindow.Bottom-csbi.srWindow.Top+1);
+    terminal.width = (int)(csbi.srWindow.Right-csbi.srWindow.Left+1);
+    terminal.height = (int)(csbi.srWindow.Bottom-csbi.srWindow.Top+1);
 #elif defined(__linux__)
     struct winsize w;
     ioctl(fileno(stdout), TIOCGWINSZ, &w);
-    width = (int)(w.ws_col);
-    height = (int)(w.ws_row);
+    terminal.width = (int)(w.ws_col);
+    terminal.height = (int)(w.ws_row);
 #endif // Windows/Linux
+    return terminal;
 }
  
 void clear() {
@@ -92,6 +116,16 @@ void hideScrollBar() {
     SetConsoleScreenBufferSize(hConsole, new_screen_buffer_size);
 }
 
+char keypress() {
+    system ("/bin/stty raw");
+    char c;
+    system("/bin/stty -echo");
+    c = getc(stdin);
+    system("/bin/stty echo");
+    system ("/bin/stty cooked");
+    return c;
+}
+
 void preventResizing() {
     HWND consoleWindow = GetConsoleWindow();
     SetWindowLong(consoleWindow, GWL_STYLE, GetWindowLong(consoleWindow, GWL_STYLE) & ~WS_MAXIMIZEBOX & ~WS_SIZEBOX);
@@ -115,27 +149,87 @@ MenuItem* navigationFabric(char *navigationNames, int size) {
     return menuItems;
 }
 
-int[] getWindowSize() {
-    int width=0, height=0;
-    getTerminalSize(width, height);
+View viewGenerateBaseMarkup(Terminal terminal) {
+    View view;
 
+    view.markup = new char*[terminal.height];
+
+    view.width = terminal.width;
+    view.height = terminal.height;
+
+    for (int i = 0; i < terminal.height; i++) view.markup[i] = new char[terminal.width];
+
+    // lets fill up this "matrix"
+    for (int i = 0; i < terminal.height; i++) {
+        char *row = new char[terminal.width];
+        for (int j = 0; j < terminal.width; j++) {
+            char symbol = ' ';
+            if (i == 0 && j < terminal.width || i == terminal.height - 1) {
+                symbol = char(196); // -
+            }
+            if (j == 0 || j == terminal.width - 1) {
+                symbol = char(179); // | 
+            }
+            row[j] = symbol;
+        }
+        view.markup[i] = row;
+    }
+
+    view.markup[0][0] = char(218); 
+    view.markup[0][terminal.width - 1] = char(191);
+    view.markup[terminal.height - 1][terminal.width - 1] = char(217);
+    view.markup[terminal.height - 1][0] = char(192);
+
+    view.amountUsedBottomSpace = 1;
+    view.amountUsedTopSpace = 1;
+
+    return view;
 }
 
-void commands() {
-
-    char view[MAX_MARKUP_SIZE][MAX_MARKUP_SIZE] = {};
-
-    int menuStartLine = height - 5;
-    int suggestionsLine = height - 3;
-    int commandLine = height - 7;
+void viewDisplayEditableZone(View &view) {
+    for (int i = 0; i < view.height; i++) {
+        for (int j = 0; j < view.width; j++) {
+        }
+    }
 }
 
-void updateView(int t) {
-    clear();
-    hideScrollBar();
-    preventResizing();
-    
+void viewGenerateMessageLine(View &view) {
+    int messageLineHeight = 1;
+    int messageLineBorder = view.amountUsedTopSpace + messageLineHeight;
 
+    for (int i = 0; i < view.height; i++) {
+        for (int j = 0; j < view.width; j++) {
+            if (i == messageLineBorder) {
+                view.markup[i][j] = char(196);
+            }
+        }
+    }
+
+    view.markup[messageLineBorder][0] = char(195);
+    view.markup[messageLineBorder][view.width - 1] = char(180);
+}
+
+void viewGenerateCommandLine(View &view) {
+    int commnadLineHeight = 2;
+    int commandLineBorder = view.height - (view.amountUsedBottomSpace + commnadLineHeight); 
+
+    for (int i = 0; i < view.height; i++) {
+        for (int j = 0; j < view.width; j++) {
+            if (i == commandLineBorder) {
+                view.markup[i][j] = char(196);
+            }
+        }
+    }
+    view.markup[commandLineBorder][0] = char(195);
+    view.markup[commandLineBorder][view.width - 1] = char(180);
+
+    view.amountUsedBottomSpace += commnadLineHeight;
+}
+
+void viewGenerateSuggestions(View &view) {
+    int menuHeight = 4;
+    int menuStartLine = view.height - (view.amountUsedBottomSpace + menuHeight);
+    int suggestionsLine = view.height - (view.amountUsedBottomSpace + 2);
 
     // \n - New записать новая запись в таблицу
     // \f - File вывод открыть файл + перемещение его в оперативку
@@ -152,62 +246,72 @@ void updateView(int t) {
     // \h - Help
     char navigationNames[] = {'n', 'f', 'b', 'a', 'w', 'i', 's', 'r', 'd', 'o', 'p', 'c', 'h'};
     int namesSize = sizeof(navigationNames) / sizeof(navigationNames[0]);
-
     MenuItem* navigationItems = navigationFabric(navigationNames, namesSize);
 
-    // lets fill up this "matrix"
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width; j++) {
-            char symbol = *" ";
-            if (i == 0 && j < width || i == height - 1) {
-                symbol = char(196); // -
-            }
-            if (j == 0 || j == width - 1) {
-                symbol = char(179); // | 
-            }
+    for (int i = 0; i < view.height; i++) {
+        for (int j = 0; j < view.width; j++) {
             if (i == menuStartLine) {
-                symbol = char(196); // -
+                view.markup[i][j] = char(196); // -
             }
-            if (i == commandLine) {
-                symbol = char(196); // -
-            }
-            view[i][j] = symbol;
         }
     }
 
-    for (int j = 0, i = 0; i < width - 2; i++) {
-        if (i % (int)ceil((width  - 2) / namesSize) == 0) {
+    for (int j = 0, i = 0; i < view.width - 2; i++) {
+        if (i % (int)ceil((view.width  - 2) / namesSize) == 0) {
             if (j >= namesSize) {
                 break;
             }
-            view[suggestionsLine][i + 1] = '\\';
-            view[suggestionsLine][i + 2] = navigationItems[j].name;
+            view.markup[suggestionsLine][i + 1] = '\\';
+            view.markup[suggestionsLine][i + 2] = navigationItems[j].name;
             j++;
         }
     }
 
-    view[0][0] = char(218); 
-    view[0][width - 1] = char(191);
-    view[height - 1][width - 1] = char(217);
-    view[height - 1][0] = char(192);
+    view.markup[menuStartLine][0] = char(195);
+    view.markup[menuStartLine][view.width - 1] = char(180);
 
-    view[menuStartLine][0] = char(195);
-    view[menuStartLine][width - 1] = char(180);
+    view.amountUsedBottomSpace += menuHeight;
+}
 
-    view[commandLine][0] = char(195);
-    view[commandLine][width - 1] = char(180);
+// void commands() {
 
-    for (int i = 0; i < height; i++) {
-        cout << view[i];
+
+
+//     int height = terminal.height;
+//     int width = terminal.width;
+// }
+
+void updateView(View view) {
+    clear();
+
+    // this fucking boolshit has to be changed
+    for (int i = 0; i < view.height; i++) {
+        for (int j = 0; j < view.width; j++) {
+            cout << view.markup[i][j];
+        }
     }
 
-    setCursor(1, commandLine + 1);
-
-    getchar();
 }
 
 int main() {
-    // and we will user this matrix for changes observing
-    updateView(0);
+    // hideScrollBar();
+    preventResizing();
+
+    Terminal terminal = getTerminalProperties();
+
+    View view = viewGenerateBaseMarkup(terminal);
+
+    viewGenerateSuggestions(view);
+    viewGenerateCommandLine(view);
+    viewGenerateMessageLine(view);
+
+    updateView(view);
+
+    cout << "Logs: Here must be logs in production mode i will remove scroll(already relised)";
+
+    setCursor(1, 1);
+
+    getchar();
+
     return 0;
 }
