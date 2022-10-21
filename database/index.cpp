@@ -8,6 +8,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define VC_EXTRALEAN
 #include <Windows.h>
+#include <conio.h> 
 #elif defined(__linux__)
 #include <sys/ioctl.h>
 #endif // Windows/Linux
@@ -42,13 +43,24 @@ struct Point {
     int y;
 };
 
+struct EditorState {
+    int currentState;
+    int insertState = 0;
+    int commandState = 1;
+    int queryState = 2;
+};
+
 struct View : Terminal {
     char **markup;
     char **editableZone;
     char **commandZone;
-    Point cursorPosition;
     int amountUsedBottomSpace;
     int amountUsedTopSpace;
+    Point cursorPosition;
+    Point logsLinePosition;
+    Point commandLinePosition;
+    Point insertZonePosition;
+    EditorState editorState;
 };
 
 
@@ -92,13 +104,13 @@ void clear() {
 #endif
 }
 
-void setCursor(int x = 0 , int y = 0)
+void setCursor(Point point)
 {
     HANDLE handle;
     COORD coordinates;
     handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    coordinates.X = x;
-    coordinates.Y = y;
+    coordinates.X = point.x;
+    coordinates.Y = point.y;
     SetConsoleCursorPosition ( handle , coordinates );
 }
 
@@ -117,12 +129,8 @@ void hideScrollBar() {
 }
 
 char keypress() {
-    system ("/bin/stty raw");
     char c;
-    system("/bin/stty -echo");
-    c = getc(stdin);
-    system("/bin/stty echo");
-    system ("/bin/stty cooked");
+    c = getch();
     return c;
 }
 
@@ -161,7 +169,6 @@ View viewGenerateBaseMarkup(Terminal terminal) {
 
     // lets fill up this "matrix"
     for (int i = 0; i < terminal.height; i++) {
-        char *row = new char[terminal.width];
         for (int j = 0; j < terminal.width; j++) {
             char symbol = ' ';
             if (i == 0 && j < terminal.width || i == terminal.height - 1) {
@@ -170,9 +177,8 @@ View viewGenerateBaseMarkup(Terminal terminal) {
             if (j == 0 || j == terminal.width - 1) {
                 symbol = char(179); // | 
             }
-            row[j] = symbol;
+            view.markup[i][j] = symbol;
         }
-        view.markup[i] = row;
     }
 
     view.markup[0][0] = char(218); 
@@ -186,11 +192,33 @@ View viewGenerateBaseMarkup(Terminal terminal) {
     return view;
 }
 
-void viewDisplayEditableZone(View &view) {
+void viewGenerateEditableZone(View &view) {
+    int editableZoneHeight = view.height - view.amountUsedTopSpace - view.amountUsedBottomSpace;
+    int editableZoneWidth =  view.width - 2;
+
+    view.editableZone = new char*[editableZoneHeight];
+
+    for (int i = 0; i < editableZoneHeight; i++) view.editableZone[i] = new char[editableZoneWidth];
+
+    //! think about it
     for (int i = 0; i < view.height; i++) {
         for (int j = 0; j < view.width; j++) {
+            if (i > view.amountUsedTopSpace - 1 && j != 0 && j != view.width - 1 && i < view.height - view.amountUsedBottomSpace - 1) {
+                view.editableZone[i][j] = '@';
+            }
         }
     }
+
+    for (int i = 0; i < view.height; i++) {
+        for (int j = 0; j < view.width; j++) {
+            if (i > view.amountUsedTopSpace - 1 && j != 0 && j != view.width - 1 && i < view.height - view.amountUsedBottomSpace - 1) {
+                view.editableZone[i][j] = '@';
+            }
+        }
+    }
+
+    view.insertZonePosition.x = 1;
+    view.insertZonePosition.y = view.amountUsedTopSpace;
 }
 
 void viewGenerateMessageLine(View &view) {
@@ -207,6 +235,8 @@ void viewGenerateMessageLine(View &view) {
 
     view.markup[messageLineBorder][0] = char(195);
     view.markup[messageLineBorder][view.width - 1] = char(180);
+
+    view.amountUsedTopSpace += 2;
 }
 
 void viewGenerateCommandLine(View &view) {
@@ -222,6 +252,9 @@ void viewGenerateCommandLine(View &view) {
     }
     view.markup[commandLineBorder][0] = char(195);
     view.markup[commandLineBorder][view.width - 1] = char(180);
+
+    view.commandLinePosition.y = commandLineBorder + 1;
+    view.commandLinePosition.x = 1;
 
     view.amountUsedBottomSpace += commnadLineHeight;
 }
@@ -273,25 +306,105 @@ void viewGenerateSuggestions(View &view) {
     view.amountUsedBottomSpace += menuHeight;
 }
 
-// void commands() {
+void cls()
+{
+    // Get the Win32 handle representing standard output.
+    // This generally only has to be done once, so we make it static.
+    static const HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    COORD topLeft = { 0, 0 };
 
+    // std::cout uses a buffer to batch writes to the underlying console.
+    // We need to flush that to the console because we're circumventing
+    // std::cout entirely; after we clear the console, we don't want
+    // stale buffered text to randomly be written out.
+    std::cout.flush();
 
-//     int height = terminal.height;
-//     int width = terminal.width;
-// }
+    // Figure out the current width and height of the console window
+    if (!GetConsoleScreenBufferInfo(hOut, &csbi)) {
+        // TODO: Handle failure!
+        abort();
+    }
+    DWORD length = csbi.dwSize.X * csbi.dwSize.Y;
+    
+    DWORD written;
+
+    // Flood-fill the console with spaces to clear it
+    FillConsoleOutputCharacter(hOut, TEXT(' '), length, topLeft, &written);
+
+    // Reset the attributes of every character to the default.
+    // This clears all background colour formatting, if any.
+    FillConsoleOutputAttribute(hOut, csbi.wAttributes, length, topLeft, &written);
+
+    // Move the cursor back to the top left for the next sequence of writes
+    SetConsoleCursorPosition(hOut, topLeft);
+}
+
 
 void updateView(View view) {
     clear();
 
-    // this fucking boolshit has to be changed
+    char vm[3600 + 1] = {};
+
     for (int i = 0; i < view.height; i++) {
         for (int j = 0; j < view.width; j++) {
-            cout << view.markup[i][j];
+            vm[i * view.width + j] = view.markup[i][j];
         }
     }
 
+    cout << vm;
 }
+
+void setCursorPositionByMode(View &view) {
+    if (view.editorState.currentState == view.editorState.queryState) {
+        view.cursorPosition = view.commandLinePosition;
+    }
+    if (view.editorState.currentState == view.editorState.insertState || view.editorState.currentState == view.editorState.commandState) {
+        view.cursorPosition = view.insertZonePosition;
+    }
+    
+    setCursor(view.cursorPosition);
+}
+
+void waitCmdCommand(View &view) {
+
+    
+}
+
+#ifndef CTRL
+#define CTRL(c) ((c) & 037)
+#endif
+
+void detectNextCursorPosition(View &view, char key) {
+    if (0 < view.cursorPosition.x && view.cursorPosition.x < view.width - 1) {
+        view.cursorPosition.x += 1;
+    }
+    setCursor(view.cursorPosition);
+}
+
+void commandKeyPressListener(View &view) {
+    char key = keypress(); 
+
+    if (view.editorState.currentState == view.editorState.commandState && key == ':') {
+        view.editorState.currentState = view.editorState.queryState;
+        setCursorPositionByMode(view);
+    }
+    else if (key == CTRL('[')) {
+        view.editorState.currentState = view.editorState.commandState;
+        setCursorPositionByMode(view);
+    }
+    else {
+        view.editableZone[view.cursorPosition.y][view.cursorPosition.x] = key;
+        updateView(view);
+        detectNextCursorPosition(view, key);
+    }
+
+
+
+    commandKeyPressListener(view);
+}
+
 
 int main() {
     // hideScrollBar();
@@ -304,14 +417,18 @@ int main() {
     viewGenerateSuggestions(view);
     viewGenerateCommandLine(view);
     viewGenerateMessageLine(view);
+    viewGenerateEditableZone(view);
+
+    view.editorState.currentState = view.editorState.commandState;
 
     updateView(view);
 
+    setCursorPositionByMode(view);
+
+    commandKeyPressListener(view);
+    // waitCmdCommand(view);
+
     cout << "Logs: Here must be logs in production mode i will remove scroll(already relised)";
-
-    setCursor(1, 1);
-
-    getchar();
 
     return 0;
 }

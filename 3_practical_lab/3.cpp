@@ -2,7 +2,7 @@
 
 using namespace std;
 
-const int limit = 2;
+const int limit = 20;
 
 int main() {
     float mult = 1;
@@ -15,5 +15,4 @@ int main() {
 
     cout << mult;
 
-    return 0;
 }
