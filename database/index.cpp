@@ -26,6 +26,8 @@ const int MAX_PATRON_LENGTH = 200;
 const int MAX_CURSE_LENGTH = 100;
 const int MAX_GROUP_LENGTH = 100;
 
+const bool IS_DEVELOPED = false;
+
 struct MenuItem {
     int id;
     char name;
@@ -52,7 +54,6 @@ struct EditorState {
 
 struct View : Terminal {
     char **markup;
-    char **editableZone;
     char **commandZone;
     int amountUsedBottomSpace;
     int amountUsedTopSpace;
@@ -61,6 +62,16 @@ struct View : Terminal {
     Point commandLinePosition;
     Point insertZonePosition;
     EditorState editorState;
+
+    char **editableZone;
+
+    int editableHeight;
+    int editableWidth;
+
+    int editableLeftBorder;
+    int editableRightBorder;
+    int editableBottomBorder;
+    int editableTopBorder;
 };
 
 
@@ -94,18 +105,12 @@ Terminal getTerminalProperties() {
     return terminal;
 }
  
-void clear() {
-#if defined _WIN32
-    system("cls");
-#elif defined (__LINUX__) || defined(__gnu_linux__) || defined(__linux__)
-    system("clear");
-#elif defined (__APPLE__)
-    system("clear");
-#endif
-}
-
-void setCursor(Point point)
-{
+void setCursor(Point point) {
+    CONSOLE_CURSOR_INFO info;
+    info.dwSize = 100;
+    info.bVisible = true;
+    SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
+    
     HANDLE handle;
     COORD coordinates;
     handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -192,33 +197,60 @@ View viewGenerateBaseMarkup(Terminal terminal) {
     return view;
 }
 
+int offsetX = 0;
+int offsetY = 0;
+
 void viewGenerateEditableZone(View &view) {
-    int editableZoneHeight = view.height - view.amountUsedTopSpace - view.amountUsedBottomSpace;
-    int editableZoneWidth =  view.width - 2;
+    view.editableHeight = view.height - view.amountUsedTopSpace - view.amountUsedBottomSpace;
+    view.editableWidth =  view.width - 2;
 
-    view.editableZone = new char*[editableZoneHeight];
+    view.editableTopBorder = 0;
+    view.editableBottomBorder = view.editableHeight - 1;
 
-    for (int i = 0; i < editableZoneHeight; i++) view.editableZone[i] = new char[editableZoneWidth];
+    view.editableLeftBorder = 0;
+    view.editableRightBorder = view.editableWidth - 1;
 
-    //! think about it
-    for (int i = 0; i < view.height; i++) {
-        for (int j = 0; j < view.width; j++) {
-            if (i > view.amountUsedTopSpace - 1 && j != 0 && j != view.width - 1 && i < view.height - view.amountUsedBottomSpace - 1) {
-                view.editableZone[i][j] = '@';
+    view.editableZone = new char*[view.editableHeight];
+
+    for (int i = 0; i < view.editableHeight; i++) view.editableZone[i] = new char[view.editableWidth];
+
+    for (int i = 0 + offsetY; i < view.editableHeight; i++) {
+        for (int j = 0 + offsetX; j < view.editableWidth; j++) {
+            view.markup[i + view.amountUsedTopSpace][j + 1] = 'A';
+        }
+    }
+
+    if (IS_DEVELOPED) {
+        for (int i = 0 + offsetY; i < view.editableHeight; i++) {
+            for (int j = 0 + offsetX; j < view.editableWidth; j++) {
+                if (i == view.editableBottomBorder) {
+                    view.markup[i + view.amountUsedTopSpace][j + 1] = 'B';
+                }
+                if (i == view.editableTopBorder) {
+                    view.markup[i + view.amountUsedTopSpace][j + 1] = 'T';
+                }
+                if (j == view.editableRightBorder) {
+                    view.markup[i + view.amountUsedTopSpace][j + 1] = 'R';
+                }
+                if (j == view.editableLeftBorder) {
+                    view.markup[i + view.amountUsedTopSpace][j + 1] = 'L';
+                }
             }
         }
     }
 
-    for (int i = 0; i < view.height; i++) {
-        for (int j = 0; j < view.width; j++) {
-            if (i > view.amountUsedTopSpace - 1 && j != 0 && j != view.width - 1 && i < view.height - view.amountUsedBottomSpace - 1) {
-                view.editableZone[i][j] = '@';
-            }
-        }
-    }
+
 
     view.insertZonePosition.x = 1;
     view.insertZonePosition.y = view.amountUsedTopSpace;
+}
+
+void mergeEditableZone(View &view) {
+    for (int i = 0 + offsetY; i < view.editableHeight; i++) {
+        for (int j = 0 + offsetX; j < view.editableWidth; j++) {
+            view.markup[i + view.amountUsedTopSpace][j + 1] = view.editableZone[i][j];
+        }
+    }
 }
 
 void viewGenerateMessageLine(View &view) {
@@ -306,44 +338,26 @@ void viewGenerateSuggestions(View &view) {
     view.amountUsedBottomSpace += menuHeight;
 }
 
-void cls()
-{
-    // Get the Win32 handle representing standard output.
-    // This generally only has to be done once, so we make it static.
-    static const HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+void clear() {	
+    COORD cursorPosition;	
+    cursorPosition.X = 0;	
+    cursorPosition.Y = 0;	
+    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), cursorPosition);
+}
 
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    COORD topLeft = { 0, 0 };
-
-    // std::cout uses a buffer to batch writes to the underlying console.
-    // We need to flush that to the console because we're circumventing
-    // std::cout entirely; after we clear the console, we don't want
-    // stale buffered text to randomly be written out.
-    std::cout.flush();
-
-    // Figure out the current width and height of the console window
-    if (!GetConsoleScreenBufferInfo(hOut, &csbi)) {
-        // TODO: Handle failure!
-        abort();
-    }
-    DWORD length = csbi.dwSize.X * csbi.dwSize.Y;
-    
-    DWORD written;
-
-    // Flood-fill the console with spaces to clear it
-    FillConsoleOutputCharacter(hOut, TEXT(' '), length, topLeft, &written);
-
-    // Reset the attributes of every character to the default.
-    // This clears all background colour formatting, if any.
-    FillConsoleOutputAttribute(hOut, csbi.wAttributes, length, topLeft, &written);
-
-    // Move the cursor back to the top left for the next sequence of writes
-    SetConsoleCursorPosition(hOut, topLeft);
+void hideCursor() {
+    CONSOLE_CURSOR_INFO info;
+    info.dwSize = 100;
+    info.bVisible = false;
+    SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
 }
 
 
 void updateView(View view) {
+    hideCursor();
+
     clear();
+
 
     char vm[3600 + 1] = {};
 
@@ -354,6 +368,11 @@ void updateView(View view) {
     }
 
     cout << vm;
+
+    Point point;
+    point.x = 0;
+    point.y = 0;
+    setCursor(point);
 }
 
 void setCursorPositionByMode(View &view) {
@@ -377,16 +396,112 @@ void waitCmdCommand(View &view) {
 #endif
 
 void detectNextCursorPosition(View &view, char key) {
-    if (0 < view.cursorPosition.x && view.cursorPosition.x < view.width - 1) {
-        view.cursorPosition.x += 1;
+
+    if (IS_DEVELOPED) {
+        cout << " " << (int)key;
     }
+
+    if ((int)key != 8) {
+
+        // new line down
+        if (view.cursorPosition.y - view.amountUsedTopSpace <= view.editableBottomBorder && view.cursorPosition.x - 1 == view.editableRightBorder && view.cursorPosition.y - view.amountUsedTopSpace != view.editableBottomBorder) {
+            view.cursorPosition.y += 1;
+            view.cursorPosition.x = 1;
+        }
+        else if (0 < view.cursorPosition.x && view.cursorPosition.x < view.width - 1) {
+            view.cursorPosition.x += 1;
+        } 
+    }
+
+    if ((int)key == 8 ) {
+        if (view.cursorPosition.y - view.amountUsedTopSpace  > view.editableTopBorder && view.cursorPosition.x - 1 == view.editableLeftBorder && view.cursorPosition.x - 1 >= view.editableLeftBorder) {
+            view.cursorPosition.x =  view.editableWidth + 1; // 
+            view.cursorPosition.y -=  1; // 
+        }  
+        else if (view.cursorPosition.x - 1 > view.editableLeftBorder) {
+            view.cursorPosition.x -= 1; // 
+        }
+    }
+
     setCursor(view.cursorPosition);
+}
+
+void addSymbol(char key, char (&arr)[200], int &i) {
+    i += 1;
+    arr[i] = key;
+}
+
+bool isPlainSymbol(char key) {
+	char arr[200] = {};
+
+	int i = 0;
+
+	char character='a';
+	do {
+		arr[i] = character;
+		character++;
+		i++;
+	} while(character<='z');
+
+	character='A';
+	do {
+		arr[i] = character;
+		character++;
+		i++;
+	} while(character<='Z');
+
+	character='0';
+	do {
+		arr[i] = character;
+		character++;
+		i++;
+	} while(character<='9');
+
+    addSymbol('+', arr, i);
+    addSymbol('-', arr, i);
+    addSymbol('/', arr, i);
+    addSymbol('|', arr, i);
+    addSymbol('\\', arr, i);
+    addSymbol('.', arr, i);
+    addSymbol(',', arr, i);
+    addSymbol(';', arr, i);
+    addSymbol('+', arr, i);
+    addSymbol('-', arr, i);
+    addSymbol('~', arr, i);
+    addSymbol('\'', arr, i);
+    addSymbol('"', arr, i);
+    addSymbol('{', arr, i);
+    addSymbol('}', arr, i);
+    addSymbol('[', arr, i);
+    addSymbol(']', arr, i);
+    addSymbol('(', arr, i);
+    addSymbol(')', arr, i);
+    addSymbol('!', arr, i);
+    addSymbol('@', arr, i);
+    addSymbol('#', arr, i);
+    addSymbol('$', arr, i);
+    addSymbol('%', arr, i);
+    addSymbol('^', arr, i);
+    addSymbol('&', arr, i);
+    addSymbol('*', arr, i);
+    addSymbol(' ', arr, i);
+
+	for (int j = 0; j < sizeof(arr) / sizeof(arr[0]); j++) {
+        if (key == arr[j]) {
+            return true;
+        }
+	}
+
+    return false;
 }
 
 void commandKeyPressListener(View &view) {
     char key = keypress(); 
 
-    if (view.editorState.currentState == view.editorState.commandState && key == ':') {
+    int editableZoneX = view.cursorPosition.x - 1;
+    int editableZoneY = view.cursorPosition.y - view.amountUsedTopSpace;
+
+    if (view.editorState.currentState == view.editorState.commandState && key == CTRL(';')) {
         view.editorState.currentState = view.editorState.queryState;
         setCursorPositionByMode(view);
     }
@@ -394,13 +509,20 @@ void commandKeyPressListener(View &view) {
         view.editorState.currentState = view.editorState.commandState;
         setCursorPositionByMode(view);
     }
-    else {
-        view.editableZone[view.cursorPosition.y][view.cursorPosition.x] = key;
+    else if ((int)key == 8) { // backspace
+        view.editableZone[editableZoneY][editableZoneX - 1] = 'A'; // -1 case check vim edition
+        mergeEditableZone(view);
         updateView(view);
         detectNextCursorPosition(view, key);
     }
-
-
+    else {
+        if (isPlainSymbol(key)) {
+            view.editableZone[editableZoneY][editableZoneX] = key;
+            mergeEditableZone(view);
+            updateView(view);
+            detectNextCursorPosition(view, key);
+        }
+    }
 
     commandKeyPressListener(view);
 }
