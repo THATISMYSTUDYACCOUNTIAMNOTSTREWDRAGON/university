@@ -54,7 +54,6 @@ struct EditorState {
 
 struct View : Terminal {
     char **markup;
-    char **commandZone;
     int amountUsedBottomSpace;
     int amountUsedTopSpace;
     Point cursorPosition;
@@ -72,6 +71,9 @@ struct View : Terminal {
     int editableRightBorder;
     int editableBottomBorder;
     int editableTopBorder;
+
+    char *queryZone;
+    char *messageZone;
 };
 
 
@@ -103,6 +105,13 @@ Terminal getTerminalProperties() {
     terminal.height = (int)(w.ws_row);
 #endif // Windows/Linux
     return terminal;
+}
+
+void clear() {	
+    COORD cursorPosition;	
+    cursorPosition.X = 0;	
+    cursorPosition.Y = 0;	
+    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), cursorPosition);
 }
  
 void setCursor(Point point) {
@@ -216,7 +225,7 @@ void viewGenerateEditableZone(View &view) {
 
     for (int i = 0 + offsetY; i < view.editableHeight; i++) {
         for (int j = 0 + offsetX; j < view.editableWidth; j++) {
-            view.markup[i + view.amountUsedTopSpace][j + 1] = 'A';
+            view.markup[i + view.amountUsedTopSpace][j + 1] = ' ';
         }
     }
 
@@ -239,13 +248,12 @@ void viewGenerateEditableZone(View &view) {
         }
     }
 
-
-
     view.insertZonePosition.x = 1;
     view.insertZonePosition.y = view.amountUsedTopSpace;
 }
 
 void mergeEditableZone(View &view) {
+    // cout << "Editable Height: " << view.editableHeight << "\n";
     for (int i = 0 + offsetY; i < view.editableHeight; i++) {
         for (int j = 0 + offsetX; j < view.editableWidth; j++) {
             view.markup[i + view.amountUsedTopSpace][j + 1] = view.editableZone[i][j];
@@ -291,60 +299,6 @@ void viewGenerateCommandLine(View &view) {
     view.amountUsedBottomSpace += commnadLineHeight;
 }
 
-void viewGenerateSuggestions(View &view) {
-    int menuHeight = 4;
-    int menuStartLine = view.height - (view.amountUsedBottomSpace + menuHeight);
-    int suggestionsLine = view.height - (view.amountUsedBottomSpace + 2);
-
-    // \n - New записать новая запись в таблицу
-    // \f - File вывод открыть файл + перемещение его в оперативку
-    // \b - Binary открыть бинарник + перемещение его в оперативку
-    // \a - All вывод ввиде таблицы
-    // \w - Write запись в текстовый
-    // \i - Insert запись в бинарник
-    // \s - Search вывод по запросу
-    // \r - Redo изменить запись
-    // \d - Del удалить запись
-    // \o - sOrt сортировать
-    // \p - Plain text 
-    // \c - Clear
-    // \h - Help
-    char navigationNames[] = {'n', 'f', 'b', 'a', 'w', 'i', 's', 'r', 'd', 'o', 'p', 'c', 'h'};
-    int namesSize = sizeof(navigationNames) / sizeof(navigationNames[0]);
-    MenuItem* navigationItems = navigationFabric(navigationNames, namesSize);
-
-    for (int i = 0; i < view.height; i++) {
-        for (int j = 0; j < view.width; j++) {
-            if (i == menuStartLine) {
-                view.markup[i][j] = char(196); // -
-            }
-        }
-    }
-
-    for (int j = 0, i = 0; i < view.width - 2; i++) {
-        if (i % (int)ceil((view.width  - 2) / namesSize) == 0) {
-            if (j >= namesSize) {
-                break;
-            }
-            view.markup[suggestionsLine][i + 1] = '\\';
-            view.markup[suggestionsLine][i + 2] = navigationItems[j].name;
-            j++;
-        }
-    }
-
-    view.markup[menuStartLine][0] = char(195);
-    view.markup[menuStartLine][view.width - 1] = char(180);
-
-    view.amountUsedBottomSpace += menuHeight;
-}
-
-void clear() {	
-    COORD cursorPosition;	
-    cursorPosition.X = 0;	
-    cursorPosition.Y = 0;	
-    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), cursorPosition);
-}
-
 void hideCursor() {
     CONSOLE_CURSOR_INFO info;
     info.dwSize = 100;
@@ -375,6 +329,64 @@ void updateView(View view) {
     setCursor(point);
 }
 
+void runHelp(View &view) {
+    clear();
+
+    cout << "\\n - New записать новая запись в таблицу" << "\n";
+    cout << "\\f - File вывод открыть файл + перемещение его в оперативку" << "\n";
+    cout << "\\b - Binary открыть бинарник + перемещение его в оперативку" << "\n";
+    cout << "\\a - All вывод ввиде таблицы" << "\n";
+    cout << "\\w - Write запись в текстовый" << "\n";
+    cout << "\\i - Insert запись в бинарник" << "\n";
+    cout << "\\s - Search вывод по запросу" << "\n";
+    cout << "\\r - Redo изменить запись" << "\n";
+    cout << "\\d - Del удалить запись" << "\n";
+    cout << "\\o - sOrt сортировать" << "\n";
+    cout << "\\p - Plain text"  << "\n";
+    cout << "\\c - Clear" << "\n";
+    cout << "\\h - Help" << "\n";
+
+    char gotIt;
+    cout << "Did you get it? (y/n): "; cin >> gotIt;
+    updateView(view); 
+}
+
+void viewGenerateSuggestions(View &view) {
+    int menuHeight = 4;
+    int menuStartLine = view.height - (view.amountUsedBottomSpace + menuHeight);
+    int suggestionsLine = view.height - (view.amountUsedBottomSpace + 2);
+
+    char navigationNames[] = {'n', 'f', 'b', 'a', 'w', 'i', 's', 'r', 'd', 'o', 'p', 'c', 'h'};
+    int namesSize = sizeof(navigationNames) / sizeof(navigationNames[0]);
+    MenuItem* navigationItems = navigationFabric(navigationNames, namesSize);
+
+    for (int i = 0; i < view.height; i++) {
+        for (int j = 0; j < view.width; j++) {
+            if (i == menuStartLine) {
+                view.markup[i][j] = char(196); // -
+            }
+        }
+    }
+
+    for (int j = 0, i = 0; i < view.width - 2; i++) {
+        if (i % (int)ceil((view.width  - 2) / namesSize) == 0) {
+            if (j >= namesSize) {
+                break;
+            }
+            view.markup[suggestionsLine][i + 1] = '\\';
+            view.markup[suggestionsLine][i + 2] = navigationItems[j].name;
+            j++;
+        }
+    }
+
+    view.markup[menuStartLine][0] = char(195);
+    view.markup[menuStartLine][view.width - 1] = char(180);
+
+    view.amountUsedBottomSpace += menuHeight;
+}
+
+
+
 void setCursorPositionByMode(View &view) {
     if (view.editorState.currentState == view.editorState.queryState) {
         view.cursorPosition = view.commandLinePosition;
@@ -396,31 +408,37 @@ void waitCmdCommand(View &view) {
 #endif
 
 void detectNextCursorPosition(View &view, char key) {
-
     if (IS_DEVELOPED) {
         cout << " " << (int)key;
     }
+    
+    if (view.editorState.currentState == view.editorState.commandState || view.editorState.currentState == view.editorState.insertState) {
 
-    if ((int)key != 8) {
+        if ((int)key != 8) {
 
-        // new line down
-        if (view.cursorPosition.y - view.amountUsedTopSpace <= view.editableBottomBorder && view.cursorPosition.x - 1 == view.editableRightBorder && view.cursorPosition.y - view.amountUsedTopSpace != view.editableBottomBorder) {
-            view.cursorPosition.y += 1;
-            view.cursorPosition.x = 1;
+            // new line down
+            if (view.cursorPosition.y - view.amountUsedTopSpace <= view.editableBottomBorder && view.cursorPosition.x - 1 == view.editableRightBorder && view.cursorPosition.y - view.amountUsedTopSpace != view.editableBottomBorder) {
+                view.cursorPosition.y += 1;
+                view.cursorPosition.x = 1;
+            }
+            else if (0 < view.cursorPosition.x && view.cursorPosition.x < view.width - 1) {
+                view.cursorPosition.x += 1;
+            } 
         }
-        else if (0 < view.cursorPosition.x && view.cursorPosition.x < view.width - 1) {
-            view.cursorPosition.x += 1;
-        } 
+
+        if ((int)key == 8 ) {
+            if (view.cursorPosition.y - view.amountUsedTopSpace  > view.editableTopBorder && view.cursorPosition.x - 1 == view.editableLeftBorder && view.cursorPosition.x - 1 >= view.editableLeftBorder) {
+                view.cursorPosition.x =  view.editableWidth + 1; // 
+                view.cursorPosition.y -=  1; // 
+            }  
+            else if (view.cursorPosition.x - 1 > view.editableLeftBorder) {
+                view.cursorPosition.x -= 1; // 
+            }
+        }
     }
 
-    if ((int)key == 8 ) {
-        if (view.cursorPosition.y - view.amountUsedTopSpace  > view.editableTopBorder && view.cursorPosition.x - 1 == view.editableLeftBorder && view.cursorPosition.x - 1 >= view.editableLeftBorder) {
-            view.cursorPosition.x =  view.editableWidth + 1; // 
-            view.cursorPosition.y -=  1; // 
-        }  
-        else if (view.cursorPosition.x - 1 > view.editableLeftBorder) {
-            view.cursorPosition.x -= 1; // 
-        }
+    if (view.editorState.currentState == view.editorState.queryState) {
+        view.cursorPosition.x += 1;    
     }
 
     setCursor(view.cursorPosition);
@@ -501,23 +519,30 @@ void commandKeyPressListener(View &view) {
     int editableZoneX = view.cursorPosition.x - 1;
     int editableZoneY = view.cursorPosition.y - view.amountUsedTopSpace;
 
-    if (view.editorState.currentState == view.editorState.commandState && key == CTRL(';')) {
+    if (view.editorState.currentState == view.editorState.commandState && key == CTRL(']')) {
         view.editorState.currentState = view.editorState.queryState;
         setCursorPositionByMode(view);
     }
-    else if (key == CTRL('[')) {
+    if (key == CTRL('[')) {
         view.editorState.currentState = view.editorState.commandState;
         setCursorPositionByMode(view);
     }
-    else if ((int)key == 8) { // backspace
-        view.editableZone[editableZoneY][editableZoneX - 1] = 'A'; // -1 case check vim edition
+    if ((int)key == 8) { // backspace
+        view.editableZone[editableZoneY][editableZoneX - 1] = ' '; // -1 case check vim edition
         mergeEditableZone(view);
         updateView(view);
         detectNextCursorPosition(view, key);
     }
     else {
         if (isPlainSymbol(key)) {
-            view.editableZone[editableZoneY][editableZoneX] = key;
+            // cout << "Editor state: " << view.editorState.currentState;
+            if (view.editorState.currentState == view.editorState.commandState || view.editorState.currentState == view.editorState.insertState) {
+                view.editableZone[editableZoneY][editableZoneX] = key;
+            }
+            if (view.editorState.currentState == view.editorState.queryState) {
+                // cout << "Work";
+                view.markup[view.cursorPosition.y][view.cursorPosition.x] = key;
+            }
             mergeEditableZone(view);
             updateView(view);
             detectNextCursorPosition(view, key);
