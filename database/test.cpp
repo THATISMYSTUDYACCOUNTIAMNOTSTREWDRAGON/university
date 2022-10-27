@@ -5,14 +5,19 @@
 
 using namespace std;
 
+struct Point {
+    int x;
+    int y;
+};
+
+struct View {
+	const char *messageLine;
+};
+
 int main() {
 	
-    system("chcp 1251");
-	setlocale(LC_ALL, "");
-	SetConsoleCP(1251);
-    SetConsoleOutputCP(1251);
-
-	cout << "Работай";
+	char *arr = "hello";
+	cout << arr;
 	// char arr[200] = {};
 
 	// int i = 0;
