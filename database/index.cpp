@@ -1,581 +1,508 @@
-#include<iostream>
-#include<math.h>
-#include<cmath>
-#include <winuser.h>
+#include <cstring>
 #include <functional>
- 
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRALEAN
-#include <Windows.h>
-#include <conio.h> 
-#elif defined(__linux__)
-#include <sys/ioctl.h>
-#endif // Windows/Linux
- 
+#include <iomanip>
+#include <iostream>
+#include <limits>
+
 using namespace std;
 
-const int MAX_STRING_LENGTH = 1000;
-const int MAX_MARKUP_SIZE = 400;
-const int AMOUNT_NAVIGATION_ITEMS = 10;
-char DEFAULT_MENU_ITEM_DESCRIPTION[MAX_STRING_LENGTH] = {'N', 'o', 'N', 'e'};
+enum Header {
+  ID,
+  Sername,
+  Name,
+  Patronical,
+  Enterance_Date,
+  Course,
+  Subject1,
+  Mark1,
+  Subject2,
+  Mark2,
+  Subject3,
+  Mark3,
+};
 
-const int MAX_NAME_LENGTH = 200;
-const int MAX_SERNAME_LENGTH = 200;
-const int MAX_PATRON_LENGTH = 200;
-const int MAX_CURSE_LENGTH = 100;
-const int MAX_GROUP_LENGTH = 100;
+inline const char *HeaderString(Header v) {
+  switch (v) {
+  case ID:
+    return "ID";
+  case Sername:
+    return "Sername";
+  case Name:
+    return "Name";
+  case Patronical:
+    return "Patronical";
+  case Enterance_Date:
+    return "Enterance_Date";
+  case Course:
+    return "Course";
+  case Subject1:
+    return "Subject1";
+  case Mark1:
+    return "Mark1";
+  case Subject2:
+    return "Subject2";
+  case Mark2:
+    return "Mark2";
+  case Subject3:
+    return "Subject3";
+  case Mark3:
+    return "Mark3";
 
-const bool IS_DEVELOPED = false;
+  default:
+    return "[Unknown]";
+  }
+}
+
+void clear() { system("clear"); }
+
+void validateIntegerInput(int number) {
+  while (true) {
+    if (cin.fail()) {
+      cin.clear();
+      cin.ignore(numeric_limits<streamsize>::max(), '\n');
+      cout << "You have entered wrong input" << endl;
+      cin >> number;
+    }
+    if (!cin.fail())
+      break;
+  }
+}
 
 struct MenuItem {
-    int id;
-    char name;
-    int hotkey;
-    char description;
+  int id;
+  const char *name;
+  function<void()> func;
 };
 
-struct Terminal {
-    int width;
-    int height;
+int menuItemId = 0;
+MenuItem createNewMenuItem(const char name[100], function<void()> func) {
+  MenuItem menuItem;
+
+  menuItem.id = menuItemId;
+  menuItem.name = name;
+  menuItem.func = func;
+
+  menuItemId += 1;
+
+  return menuItem;
+}
+
+void cleanOrNot() {
+  char y;
+  cout << "Clearn output(Y/n): ";
+  cin >> y;
+  if (y == 'y') {
+    clear();
+  }
+}
+
+int menuItemsAmount = 0;
+MenuItem *menuItems = new MenuItem[menuItemsAmount];
+
+void addMenuItem(MenuItem newItem) {
+  int newMenuItemsAmount = menuItemsAmount + 1;
+
+  MenuItem *newMenuItems = new MenuItem[newMenuItemsAmount];
+
+  for (int i = 0; i < menuItemsAmount; i++) {
+    newMenuItems[i] = menuItems[i];
+  }
+
+  newMenuItems[menuItemsAmount] = newItem;
+
+  delete[] menuItems;
+  menuItems = newMenuItems;
+  newMenuItems = NULL;
+  menuItemsAmount = newMenuItemsAmount;
+}
+
+void printMenu() {
+  for (int i = 0; i < menuItemsAmount; i++) {
+    cout << menuItems[i].id << " "
+         << " " << menuItems[i].name << endl;
+  }
+}
+
+struct FullName {
+  char name[100];
+  char sername[100];
+  char patronical[100];
 };
 
-struct Point {
-    int x;
-    int y;
+struct Marks {
+  char name1[100];
+  int mark1;
+
+  char name2[100];
+  int mark2;
+
+  char name3[100];
+  int mark3;
 };
-
-struct EditorState {
-    int currentState;
-    int insertState = 0;
-    int commandState = 1;
-    int queryState = 2;
-};
-
-struct View : Terminal {
-    char **markup;
-    int amountUsedBottomSpace;
-    int amountUsedTopSpace;
-    Point cursorPosition;
-    Point logsLinePosition;
-    Point commandLinePosition;
-    Point insertZonePosition;
-    EditorState editorState;
-
-    char **editableZone;
-
-    int editableHeight;
-    int editableWidth;
-
-    int editableLeftBorder;
-    int editableRightBorder;
-    int editableBottomBorder;
-    int editableTopBorder;
-
-    char *queryZone;
-    char *messageZone;
-};
-
 
 struct Student {
-    int id;
-    char name[MAX_NAME_LENGTH];
-    char sername[MAX_SERNAME_LENGTH];
-    int birthDate;
-    char curse[MAX_CURSE_LENGTH];
-    char group[MAX_GROUP_LENGTH];
-    int firstMark;
-    int secondMark;
-    int thirdMark;
+  int id;
+
+  FullName fullname;
+
+  char birth[100];
+  char group[100];
+
+  int enteranceDate;
+  int course;
+
+  Marks marks;
 };
 
+Student createStudent(int id) {
+  Student student;
 
- 
-Terminal getTerminalProperties() {
-    Terminal terminal;
-#if defined(_WIN32)
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-    terminal.width = (int)(csbi.srWindow.Right-csbi.srWindow.Left+1);
-    terminal.height = (int)(csbi.srWindow.Bottom-csbi.srWindow.Top+1);
-#elif defined(__linux__)
-    struct winsize w;
-    ioctl(fileno(stdout), TIOCGWINSZ, &w);
-    terminal.width = (int)(w.ws_col);
-    terminal.height = (int)(w.ws_row);
-#endif // Windows/Linux
-    return terminal;
+  // костыли!!!! переделать!
+  cout << "Input name(string): ";
+  cin >> student.fullname.name;
+  cout << "Input sername(string): ";
+  cin >> student.fullname.sername;
+  cout << "Input patronical(string): ";
+  cin >> student.fullname.patronical;
+
+  cout << "Input birth date(string): ";
+  cin >> student.birth;
+  cout << "Input course(int): ";
+  cin >> student.course;
+  cout << "Input enterance date(string): ";
+  cin >> student.enteranceDate;
+  cout << "Input group(string): ";
+  cin >> student.group;
+
+  cout << "Input sub name1(int): ";
+  cin >> student.marks.name1;
+  cout << "Input sub mark1(int): ";
+  cin >> student.marks.mark1;
+
+  cout << "Input sub name2(int): ";
+  cin >> student.marks.name2;
+  cout << "Input sub mark2(int): ";
+  cin >> student.marks.mark2;
+
+  cout << "Input sub name3(int): ";
+  cin >> student.marks.name3;
+  cout << "Input sub mark3(int): ";
+  cin >> student.marks.mark3;
+
+  student.id = id;
+
+  return student;
 }
 
-void clear() {	
-    COORD cursorPosition;	
-    cursorPosition.X = 0;	
-    cursorPosition.Y = 0;	
-    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), cursorPosition);
-}
- 
-void setCursor(Point point) {
-    CONSOLE_CURSOR_INFO info;
-    info.dwSize = 100;
-    info.bVisible = true;
-    SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
-    
-    HANDLE handle;
-    COORD coordinates;
-    handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    coordinates.X = point.x;
-    coordinates.Y = point.y;
-    SetConsoleCursorPosition ( handle , coordinates );
-}
+int studentsAmount = 0;
+Student *storage = new Student[studentsAmount];
 
-void hideScrollBar() {
-    CONSOLE_SCREEN_BUFFER_INFO screenBufferInfo; 
+void appendStudent() {
+  int newStudentsAmount = studentsAmount + 1;
 
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    GetConsoleScreenBufferInfo(hConsole, &screenBufferInfo);
-    COORD new_screen_buffer_size;
-    new_screen_buffer_size.X = screenBufferInfo.srWindow.Right - 
-    screenBufferInfo.srWindow.Left + 1; // Columns
-    new_screen_buffer_size.Y = screenBufferInfo.srWindow.Bottom - 
-    screenBufferInfo.srWindow.Top + 1; // Rows
+  Student *newStorage = new Student[newStudentsAmount];
 
-    SetConsoleScreenBufferSize(hConsole, new_screen_buffer_size);
+  for (int i = 0; i < studentsAmount; i++) {
+    newStorage[i] = storage[i];
+  }
+
+  newStorage[studentsAmount] = createStudent(studentsAmount);
+
+  delete[] storage;
+  storage = newStorage;
+  newStorage = NULL;
+  studentsAmount = newStudentsAmount;
+
+  cleanOrNot();
 }
 
-char keypress() {
-    char c;
-    c = getch();
-    return c;
+void drawDivider(int width) {
+  for (int i = 0; i < width; i++) {
+    cout << "-";
+  }
+  cout << "\n";
 }
 
-void preventResizing() {
-    HWND consoleWindow = GetConsoleWindow();
-    SetWindowLong(consoleWindow, GWL_STYLE, GetWindowLong(consoleWindow, GWL_STYLE) & ~WS_MAXIMIZEBOX & ~WS_SIZEBOX);
+void drawHeader(int width) {
+  drawDivider(width * (Header::Mark3 + 2));
+  for (int i = Header::ID; i <= Header::Mark3; i++) {
+    cout << setw(width) << HeaderString(static_cast<Header>(i)) << '|';
+  }
+  cout << "\n";
+  drawDivider(width * (Header::Mark3 + 2));
 }
 
-MenuItem getNewNavItem(int id, char name, int hotkey, char description[] = DEFAULT_MENU_ITEM_DESCRIPTION) {
-    MenuItem menuItem;
-    menuItem.id = id;
-    menuItem.name = name;
-    menuItem.hotkey = hotkey;
-    menuItem.description = name;
-    return menuItem;
+void drawRow(Student student, int width) {
+  cout << setw(width) << student.id << "|" << setw(width)
+       << student.fullname.sername << "|" << setw(width)
+       << student.fullname.name << "|" << setw(width)
+       << student.fullname.patronical << "|" << setw(width)
+       << student.enteranceDate << "|" << setw(width) << student.course << "|"
+       << setw(width) << student.marks.name1 << "|" << setw(width)
+       << student.marks.mark1 << "|" << setw(width) << student.marks.name2
+       << "|" << setw(width) << student.marks.mark2 << "|" << setw(width)
+       << student.marks.name3 << "|" << setw(width) << student.marks.mark3
+       << "|" << endl;
 }
 
-MenuItem* navigationFabric(char *navigationNames, int size) {
-    MenuItem *menuItems = new MenuItem[size];
-    for (int i = 0; i < size; i++) {
-        MenuItem newNavItem = getNewNavItem(i, navigationNames[i], char(navigationNames[i]));
-        menuItems[i] = newNavItem;
+void printAll() {
+  cout << "Drawing is starting..." << endl;
+  int width = 15;
+  drawHeader(width);
+  for (int i = 0; i < studentsAmount; i++) {
+    drawRow(storage[i], width);
+    drawDivider(width * (Header::Mark3 + 2));
+  }
+  cleanOrNot();
+}
+
+// тк мне лень возвращять новый массив выводим в real time
+void printByQuery() {
+  cout << "Drawing is starting..." << endl;
+  drawHeader(15);
+  for (int i = 0; i < studentsAmount; i++) {
+    int sutisfyingResults = 0;
+    Student student = storage[i];
+    int marks[] = {student.marks.mark3, student.marks.mark2,
+                   student.marks.mark1};
+    for (int i = 0; i < sizeof(marks) / sizeof(marks[0]); i++) {
+      if (marks[i] == 4) {
+        sutisfyingResults += 1;
+      }
     }
-    return menuItems;
+    if (sutisfyingResults >= 1) {
+      drawRow(storage[i], 15);
+      drawDivider(15 * (Header::Mark3 + 2));
+    }
+  }
+  cleanOrNot();
 }
 
-View viewGenerateBaseMarkup(Terminal terminal) {
-    View view;
-
-    view.markup = new char*[terminal.height];
-
-    view.width = terminal.width;
-    view.height = terminal.height;
-
-    for (int i = 0; i < terminal.height; i++) view.markup[i] = new char[terminal.width];
-
-    // lets fill up this "matrix"
-    for (int i = 0; i < terminal.height; i++) {
-        for (int j = 0; j < terminal.width; j++) {
-            char symbol = ' ';
-            if (i == 0 && j < terminal.width || i == terminal.height - 1) {
-                symbol = char(196); // -
-            }
-            if (j == 0 || j == terminal.width - 1) {
-                symbol = char(179); // | 
-            }
-            view.markup[i][j] = symbol;
-        }
+int getMenuEnumId(char *fuild) {
+  for (int i = Header::ID; i <= Header::Mark3; i++) {
+    if (strcmp(fuild, HeaderString(static_cast<Header>(i))) == 0) {
+      return i;
     }
-
-    view.markup[0][0] = char(218); 
-    view.markup[0][terminal.width - 1] = char(191);
-    view.markup[terminal.height - 1][terminal.width - 1] = char(217);
-    view.markup[terminal.height - 1][0] = char(192);
-
-    view.amountUsedBottomSpace = 1;
-    view.amountUsedTopSpace = 1;
-
-    return view;
+  }
+  return -1;
 }
 
-int offsetX = 0;
-int offsetY = 0;
+void bubble_sort() {
+  if (studentsAmount == 0) {
+    cout << "Database is empty!" << endl;
+    return;
+  }
+  char fuild[100];
+  cout << "Input fuild name you wanna change" << endl;
+  cin >> fuild;
 
-void viewGenerateEditableZone(View &view) {
-    view.editableHeight = view.height - view.amountUsedTopSpace - view.amountUsedBottomSpace;
-    view.editableWidth =  view.width - 2;
+  int enumFuild = getMenuEnumId(fuild);
 
-    view.editableTopBorder = 0;
-    view.editableBottomBorder = view.editableHeight - 1;
 
-    view.editableLeftBorder = 0;
-    view.editableRightBorder = view.editableWidth - 1;
+  if (enumFuild == -1) {
+    cout << "Incorrect value!" << endl;
+    return;
+  }
 
-    view.editableZone = new char*[view.editableHeight];
+  Student temp;
 
-    for (int i = 0; i < view.editableHeight; i++) view.editableZone[i] = new char[view.editableWidth];
+  for (int i = 0; i < studentsAmount - 1; i++) {
+    for (int j = 0; j < studentsAmount - i - 1; j++) {
 
-    for (int i = 0 + offsetY; i < view.editableHeight; i++) {
-        for (int j = 0 + offsetX; j < view.editableWidth; j++) {
-            view.markup[i + view.amountUsedTopSpace][j + 1] = ' ';
-        }
+      char a;
+      char b;
+
+      switch (enumFuild) {
+      case Header::ID:
+        a = storage[j].id;
+        b = storage[j + 1].id;
+        break;
+      case Header::Name:
+        a = storage[j].fullname.name[0];
+        b = storage[j + 1].fullname.name[0];
+        break;
+      case Header::Sername:
+        a = storage[j].fullname.sername[0];
+        b = storage[j + 1].fullname.name[0];
+        break;
+      case Header::Patronical:
+        a = storage[j].fullname.patronical[0];
+        b = storage[j + 1].fullname.patronical[0];
+        break;
+      case Header::Course:
+        a = storage[j].course;
+        b = storage[j + 1].course;
+        break;
+      case Header::Enterance_Date:
+        a = storage[j].enteranceDate;
+        b = storage[j + 1].enteranceDate;
+        break;
+      case Header::Subject1:
+        a = storage[j].marks.name1[0];
+        b = storage[j + 1].marks.name1[0];
+        break;
+      case Header::Subject2:
+        a = storage[j].marks.name2[0];
+        b = storage[j + 1].marks.name2[0];
+        break;
+      case Header::Subject3:
+        a = storage[j].marks.name3[0];
+        b = storage[j + 1].marks.name3[0];
+        break;
+      case Header::Mark1:
+        a = storage[j].marks.mark1;
+        b = storage[j + 1].marks.mark1;
+        break;
+      case Header::Mark2:
+        a = storage[j].marks.mark2;
+        b = storage[j + 1].marks.mark2;
+        break;
+      case Header::Mark3:
+        a = storage[j].marks.mark3;
+        b = storage[j + 1].marks.mark3;
+        break;
+
+      default:
+        cout
+            << "You havent chosen fuild properly. Or you are just havent chosen"
+            << endl;
+      }
+
+      if (a > b) {
+        temp = storage[j];
+        storage[j] = storage[j + 1];
+        storage[j + 1] = temp;
+      }
     }
+  }
 
-    if (IS_DEVELOPED) {
-        for (int i = 0 + offsetY; i < view.editableHeight; i++) {
-            for (int j = 0 + offsetX; j < view.editableWidth; j++) {
-                if (i == view.editableBottomBorder) {
-                    view.markup[i + view.amountUsedTopSpace][j + 1] = 'B';
-                }
-                if (i == view.editableTopBorder) {
-                    view.markup[i + view.amountUsedTopSpace][j + 1] = 'T';
-                }
-                if (j == view.editableRightBorder) {
-                    view.markup[i + view.amountUsedTopSpace][j + 1] = 'R';
-                }
-                if (j == view.editableLeftBorder) {
-                    view.markup[i + view.amountUsedTopSpace][j + 1] = 'L';
-                }
-            }
-        }
-    }
-
-    view.insertZonePosition.x = 1;
-    view.insertZonePosition.y = view.amountUsedTopSpace;
+  cout << "Succesfully sorted" << endl;
 }
 
-void mergeEditableZone(View &view) {
-    // cout << "Editable Height: " << view.editableHeight << "\n";
-    for (int i = 0 + offsetY; i < view.editableHeight; i++) {
-        for (int j = 0 + offsetX; j < view.editableWidth; j++) {
-            view.markup[i + view.amountUsedTopSpace][j + 1] = view.editableZone[i][j];
-        }
+void edit() {
+  int id;
+  cout << "Please input user id: ";
+  cin >> id;
+
+  validateIntegerInput(id);
+
+  if (0 <= id && id < studentsAmount) {
+    char y;
+    cout << "Do you wanna change all?(Y/n): ";
+    cin >> y;
+    if (y == 'y') {
+      storage[id] = createStudent(id);
+    } else {
+      char fuild[100];
+      cout << "Input fuild name you wanna change" << endl;
+      cin >> fuild;
+      int enumFuild = getMenuEnumId(fuild);
+
+      if (enumFuild != -1)
+        cout << "Input new value" << endl;
+
+      switch (enumFuild) {
+      case Header::ID:
+        break;
+      case Header::Name:
+        cin >> storage[id].fullname.name;
+        break;
+      case Header::Sername:
+        cin >> storage[id].fullname.sername;
+        break;
+      case Header::Patronical:
+        cin >> storage[id].fullname.patronical;
+        break;
+      case Header::Course:
+        cin >> storage[id].course;
+        break;
+      case Header::Enterance_Date:
+        cin >> storage[id].enteranceDate;
+        break;
+      case Header::Subject1:
+        cin >> storage[id].marks.name1;
+        break;
+      case Header::Subject2:
+        cin >> storage[id].marks.name2;
+        break;
+      case Header::Subject3:
+        cin >> storage[id].marks.name3;
+        break;
+      case Header::Mark1:
+        cin >> storage[id].marks.mark1;
+        break;
+      case Header::Mark2:
+        cin >> storage[id].marks.mark2;
+        break;
+      case Header::Mark3:
+        cin >> storage[id].marks.mark3;
+        break;
+
+      default:
+        cout
+            << "You havent chosen fuild properly. Or you are just havent chosen"
+            << endl;
+      }
     }
+  }
+
+  cleanOrNot();
 }
 
-void viewGenerateMessageLine(View &view) {
-    int messageLineHeight = 1;
-    int messageLineBorder = view.amountUsedTopSpace + messageLineHeight;
+void deleteOne() {
+  cout << "Startign user deleting" << endl;
+  int id;
+  cout << "Please input user id: ";
+  cin >> id;
 
-    for (int i = 0; i < view.height; i++) {
-        for (int j = 0; j < view.width; j++) {
-            if (i == messageLineBorder) {
-                view.markup[i][j] = char(196);
-            }
-        }
-    }
+  int elements_to_move = studentsAmount - id - 1;
 
-    view.markup[messageLineBorder][0] = char(195);
-    view.markup[messageLineBorder][view.width - 1] = char(180);
+  memmove(&storage[id], &storage[id + 1],
+          elements_to_move * sizeof(storage[0]));
 
-    view.amountUsedTopSpace += 2;
+  studentsAmount -= 1;
+
+  for (int i = 0; i < studentsAmount; i++) {
+    storage[0].id = i;
+  }
+  cleanOrNot();
 }
 
-void viewGenerateCommandLine(View &view) {
-    int commnadLineHeight = 2;
-    int commandLineBorder = view.height - (view.amountUsedBottomSpace + commnadLineHeight); 
+void readUserInput() {
+  printMenu();
+  cout << "Enter commands in 0 to xz range or press CTRL-c to exit: ";
 
-    for (int i = 0; i < view.height; i++) {
-        for (int j = 0; j < view.width; j++) {
-            if (i == commandLineBorder) {
-                view.markup[i][j] = char(196);
-            }
-        }
+  int command;
+  cin >> command;
+
+  cout << command << endl;
+
+  validateIntegerInput(command);
+
+  for (int i = 0; i < menuItemsAmount; i++) {
+    if (i == command) {
+      menuItems[i].func();
     }
-    view.markup[commandLineBorder][0] = char(195);
-    view.markup[commandLineBorder][view.width - 1] = char(180);
-
-    view.commandLinePosition.y = commandLineBorder + 1;
-    view.commandLinePosition.x = 1;
-
-    view.amountUsedBottomSpace += commnadLineHeight;
+  }
+  readUserInput();
 }
 
-void hideCursor() {
-    CONSOLE_CURSOR_INFO info;
-    info.dwSize = 100;
-    info.bVisible = false;
-    SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
+void generateMenu() {
+  addMenuItem(createNewMenuItem("show all students", printAll));
+  addMenuItem(createNewMenuItem("edit student", edit));
+  addMenuItem(createNewMenuItem("delete student", deleteOne));
+  addMenuItem(createNewMenuItem("add new student", appendStudent));
+  addMenuItem(createNewMenuItem("find students by marks", printByQuery));
+  addMenuItem(createNewMenuItem("sort students by fuild", bubble_sort));
 }
-
-
-void updateView(View view) {
-    hideCursor();
-
-    clear();
-
-
-    char vm[3600 + 1] = {};
-
-    for (int i = 0; i < view.height; i++) {
-        for (int j = 0; j < view.width; j++) {
-            vm[i * view.width + j] = view.markup[i][j];
-        }
-    }
-
-    cout << vm;
-
-    Point point;
-    point.x = 0;
-    point.y = 0;
-    setCursor(point);
-}
-
-void runHelp(View &view) {
-    clear();
-
-    cout << "\\n - New записать новая запись в таблицу" << "\n";
-    cout << "\\f - File вывод открыть файл + перемещение его в оперативку" << "\n";
-    cout << "\\b - Binary открыть бинарник + перемещение его в оперативку" << "\n";
-    cout << "\\a - All вывод ввиде таблицы" << "\n";
-    cout << "\\w - Write запись в текстовый" << "\n";
-    cout << "\\i - Insert запись в бинарник" << "\n";
-    cout << "\\s - Search вывод по запросу" << "\n";
-    cout << "\\r - Redo изменить запись" << "\n";
-    cout << "\\d - Del удалить запись" << "\n";
-    cout << "\\o - sOrt сортировать" << "\n";
-    cout << "\\p - Plain text"  << "\n";
-    cout << "\\c - Clear" << "\n";
-    cout << "\\h - Help" << "\n";
-
-    char gotIt;
-    cout << "Did you get it? (y/n): "; cin >> gotIt;
-    updateView(view); 
-}
-
-void viewGenerateSuggestions(View &view) {
-    int menuHeight = 4;
-    int menuStartLine = view.height - (view.amountUsedBottomSpace + menuHeight);
-    int suggestionsLine = view.height - (view.amountUsedBottomSpace + 2);
-
-    char navigationNames[] = {'n', 'f', 'b', 'a', 'w', 'i', 's', 'r', 'd', 'o', 'p', 'c', 'h'};
-    int namesSize = sizeof(navigationNames) / sizeof(navigationNames[0]);
-    MenuItem* navigationItems = navigationFabric(navigationNames, namesSize);
-
-    for (int i = 0; i < view.height; i++) {
-        for (int j = 0; j < view.width; j++) {
-            if (i == menuStartLine) {
-                view.markup[i][j] = char(196); // -
-            }
-        }
-    }
-
-    for (int j = 0, i = 0; i < view.width - 2; i++) {
-        if (i % (int)ceil((view.width  - 2) / namesSize) == 0) {
-            if (j >= namesSize) {
-                break;
-            }
-            view.markup[suggestionsLine][i + 1] = '\\';
-            view.markup[suggestionsLine][i + 2] = navigationItems[j].name;
-            j++;
-        }
-    }
-
-    view.markup[menuStartLine][0] = char(195);
-    view.markup[menuStartLine][view.width - 1] = char(180);
-
-    view.amountUsedBottomSpace += menuHeight;
-}
-
-
-
-void setCursorPositionByMode(View &view) {
-    if (view.editorState.currentState == view.editorState.queryState) {
-        view.cursorPosition = view.commandLinePosition;
-    }
-    if (view.editorState.currentState == view.editorState.insertState || view.editorState.currentState == view.editorState.commandState) {
-        view.cursorPosition = view.insertZonePosition;
-    }
-    
-    setCursor(view.cursorPosition);
-}
-
-void waitCmdCommand(View &view) {
-
-    
-}
-
-#ifndef CTRL
-#define CTRL(c) ((c) & 037)
-#endif
-
-void detectNextCursorPosition(View &view, char key) {
-    if (IS_DEVELOPED) {
-        cout << " " << (int)key;
-    }
-    
-    if (view.editorState.currentState == view.editorState.commandState || view.editorState.currentState == view.editorState.insertState) {
-
-        if ((int)key != 8) {
-
-            // new line down
-            if (view.cursorPosition.y - view.amountUsedTopSpace <= view.editableBottomBorder && view.cursorPosition.x - 1 == view.editableRightBorder && view.cursorPosition.y - view.amountUsedTopSpace != view.editableBottomBorder) {
-                view.cursorPosition.y += 1;
-                view.cursorPosition.x = 1;
-            }
-            else if (0 < view.cursorPosition.x && view.cursorPosition.x < view.width - 1) {
-                view.cursorPosition.x += 1;
-            } 
-        }
-
-        if ((int)key == 8 ) {
-            if (view.cursorPosition.y - view.amountUsedTopSpace  > view.editableTopBorder && view.cursorPosition.x - 1 == view.editableLeftBorder && view.cursorPosition.x - 1 >= view.editableLeftBorder) {
-                view.cursorPosition.x =  view.editableWidth + 1; // 
-                view.cursorPosition.y -=  1; // 
-            }  
-            else if (view.cursorPosition.x - 1 > view.editableLeftBorder) {
-                view.cursorPosition.x -= 1; // 
-            }
-        }
-    }
-
-    if (view.editorState.currentState == view.editorState.queryState) {
-        view.cursorPosition.x += 1;    
-    }
-
-    setCursor(view.cursorPosition);
-}
-
-void addSymbol(char key, char (&arr)[200], int &i) {
-    i += 1;
-    arr[i] = key;
-}
-
-bool isPlainSymbol(char key) {
-	char arr[200] = {};
-
-	int i = 0;
-
-	char character='a';
-	do {
-		arr[i] = character;
-		character++;
-		i++;
-	} while(character<='z');
-
-	character='A';
-	do {
-		arr[i] = character;
-		character++;
-		i++;
-	} while(character<='Z');
-
-	character='0';
-	do {
-		arr[i] = character;
-		character++;
-		i++;
-	} while(character<='9');
-
-    addSymbol('+', arr, i);
-    addSymbol('-', arr, i);
-    addSymbol('/', arr, i);
-    addSymbol('|', arr, i);
-    addSymbol('\\', arr, i);
-    addSymbol('.', arr, i);
-    addSymbol(',', arr, i);
-    addSymbol(';', arr, i);
-    addSymbol('+', arr, i);
-    addSymbol('-', arr, i);
-    addSymbol('~', arr, i);
-    addSymbol('\'', arr, i);
-    addSymbol('"', arr, i);
-    addSymbol('{', arr, i);
-    addSymbol('}', arr, i);
-    addSymbol('[', arr, i);
-    addSymbol(']', arr, i);
-    addSymbol('(', arr, i);
-    addSymbol(')', arr, i);
-    addSymbol('!', arr, i);
-    addSymbol('@', arr, i);
-    addSymbol('#', arr, i);
-    addSymbol('$', arr, i);
-    addSymbol('%', arr, i);
-    addSymbol('^', arr, i);
-    addSymbol('&', arr, i);
-    addSymbol('*', arr, i);
-    addSymbol(' ', arr, i);
-
-	for (int j = 0; j < sizeof(arr) / sizeof(arr[0]); j++) {
-        if (key == arr[j]) {
-            return true;
-        }
-	}
-
-    return false;
-}
-
-void commandKeyPressListener(View &view) {
-    char key = keypress(); 
-
-    int editableZoneX = view.cursorPosition.x - 1;
-    int editableZoneY = view.cursorPosition.y - view.amountUsedTopSpace;
-
-    if (view.editorState.currentState == view.editorState.commandState && key == CTRL(']')) {
-        view.editorState.currentState = view.editorState.queryState;
-        setCursorPositionByMode(view);
-    }
-    if (key == CTRL('[')) {
-        view.editorState.currentState = view.editorState.commandState;
-        setCursorPositionByMode(view);
-    }
-    if ((int)key == 8) { // backspace
-        view.editableZone[editableZoneY][editableZoneX - 1] = ' '; // -1 case check vim edition
-        mergeEditableZone(view);
-        updateView(view);
-        detectNextCursorPosition(view, key);
-    }
-    else {
-        if (isPlainSymbol(key)) {
-            // cout << "Editor state: " << view.editorState.currentState;
-            if (view.editorState.currentState == view.editorState.commandState || view.editorState.currentState == view.editorState.insertState) {
-                view.editableZone[editableZoneY][editableZoneX] = key;
-            }
-            if (view.editorState.currentState == view.editorState.queryState) {
-                // cout << "Work";
-                view.markup[view.cursorPosition.y][view.cursorPosition.x] = key;
-            }
-            mergeEditableZone(view);
-            updateView(view);
-            detectNextCursorPosition(view, key);
-        }
-    }
-
-    commandKeyPressListener(view);
-}
-
 
 int main() {
-    // hideScrollBar();
-    preventResizing();
 
-    Terminal terminal = getTerminalProperties();
+  setlocale(0, "");
 
-    View view = viewGenerateBaseMarkup(terminal);
+  generateMenu();
 
-    viewGenerateSuggestions(view);
-    viewGenerateCommandLine(view);
-    viewGenerateMessageLine(view);
-    viewGenerateEditableZone(view);
+  readUserInput();
 
-    view.editorState.currentState = view.editorState.commandState;
-
-    updateView(view);
-
-    setCursorPositionByMode(view);
-
-    commandKeyPressListener(view);
-    // waitCmdCommand(view);
-
-    cout << "Logs: Here must be logs in production mode i will remove scroll(already relised)";
-
-    return 0;
+  return 0;
 }
