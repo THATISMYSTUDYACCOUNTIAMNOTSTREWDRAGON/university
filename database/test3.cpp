@@ -98,7 +98,7 @@ Student createNewStudent() {
   student.storageSize = 0;
   student.storage = new KeyValue[0];
 
-  for (int i = Fuild::Name; i < Fuild::Mark3; ++i) {
+  for (int i = Fuild::Name; i <= Fuild::Mark3; ++i) {
     KeyValue keyvalue;
 
     keyvalue.key = (Fuild)i;
